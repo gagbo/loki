@@ -22,7 +22,7 @@ loki:
     bucketNames:
       chunks: chunks
       ruler: ruler
-      admin: admin
+      # admin: admin
 
 #gateway:
 #  ingress:
