@@ -7,7 +7,7 @@ loki:
     bucketNames:
       chunks: chunks
       ruler: ruler
-      admin: admin
+      # admin: admin
 deploymentMode: SingleBinary
 singleBinary:
   replicas: 1
