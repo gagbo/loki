@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"runtime"
@@ -17,9 +18,13 @@ import (
 	"github.com/grafana/loki/v3/clients/pkg/promtail/wal"
 )
 
+const eventBatchSize = 3
+
 var (
 	yellow = color.New(color.FgYellow)
 	blue   = color.New(color.FgBlue)
+	red    = color.New(color.FgRed)
+	cyan   = color.New(color.FgCyan)
 )
 
 func init() {
@@ -73,13 +78,37 @@ func (l *logger) Chan() chan<- api.Entry {
 }
 
 func (l *logger) run() {
+	debugMultiBatch := newBatch(999999)
+	batchCount := 0
 	for e := range l.entries {
+		debugBatch := newBatch(999999, e)
+		pushRequest, _, err := debugBatch.encode()
+		if err == nil {
+			fmt.Fprint(l.Writer, cyan.Sprint("Single event: \n"))
+			fmt.Fprint(l.Writer, cyan.Sprint(base64.StdEncoding.EncodeToString(pushRequest)))
+			fmt.Fprint(l.Writer, "\n")
+		}
 		fmt.Fprint(l.Writer, blue.Sprint(e.Timestamp.Format("2006-01-02T15:04:05.999999999-0700")))
 		fmt.Fprint(l.Writer, "\t")
 		fmt.Fprint(l.Writer, yellow.Sprint(e.Labels.String()))
 		fmt.Fprint(l.Writer, "\t")
 		fmt.Fprint(l.Writer, e.Line)
 		fmt.Fprint(l.Writer, "\n")
+		fmt.Fprint(l.Writer, cyan.Sprint("----------------------------\n"))
+		debugMultiBatch.add(e)
+		batchCount = batchCount + 1
+		if batchCount == eventBatchSize {
+			batchCount = 0
+			pushRequest, _, err := debugMultiBatch.encode()
+			if err == nil {
+				fmt.Fprint(l.Writer, red.Sprint("Batch: \n"))
+				fmt.Fprint(l.Writer, red.Sprint(base64.StdEncoding.EncodeToString(pushRequest)))
+				fmt.Fprint(l.Writer, "\n")
+			}
+			debugMultiBatch = newBatch(999999)
+			fmt.Fprint(l.Writer, red.Sprint("----------------------------\n"))
+			fmt.Fprint(l.Writer, red.Sprint("----------------------------\n"))
+		}
 		l.Flush()
 	}
 }
